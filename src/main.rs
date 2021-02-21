@@ -2,11 +2,11 @@ mod core;
 mod creeps;
 
 use crate::core::*;
-use log::LevelFilter::Info;
+use log::LevelFilter::Debug;
 use stdweb::js;
 
 fn main() {
-    logging::setup_logging(Info);
+    logging::setup_logging(Debug);
 
     js! {
         var game_loop = @{game_loop};

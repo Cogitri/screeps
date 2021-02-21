@@ -57,18 +57,24 @@ impl Creep {
     }
 
     fn enable_building(&self) {
+        assert_eq!(self.inner.say("Building!", false), ReturnCode::Ok);
+
         self.inner.memory().set("building", true);
         self.inner.memory().set("harvesting", false);
         self.inner.memory().set("upgrading", false);
     }
 
     fn enable_harvesting(&self) {
+        assert_eq!(self.inner.say("Harvesting!", false), ReturnCode::Ok);
+
         self.inner.memory().set("building", false);
         self.inner.memory().set("harvesting", true);
         self.inner.memory().set("upgrading", false);
     }
 
     fn enable_upgrading(&self) {
+        assert_eq!(self.inner.say("Upgrading!", false), ReturnCode::Ok);
+
         self.inner.memory().set("building", false);
         self.inner.memory().set("harvesting", false);
         self.inner.memory().set("upgrading", true);
@@ -77,23 +83,23 @@ impl Creep {
     fn build(&self) -> Result<(), Error> {
         assert_eq!(self.role, Role::Building);
 
-        if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
-            self.enable_harvesting();
-        }
+        debug!("Running build");
 
         if let Some(c) = screeps::game::construction_sites::values().first() {
             let r = self.inner.build(&c);
             if r == ReturnCode::NotInRange {
                 self.inner.move_to(c);
             } else if r == ReturnCode::Ok {
-                if self.inner.store_used_capacity(None) == 0 {
+                if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
+                    debug!("No energy left; switching to harvesting");
                     self.enable_harvesting();
                 }
             } else {
-                return Err(Error::Upgrade(r));
+                return Err(Error::Build(r));
             }
         } else {
-            self.enable_harvesting()
+            debug!("No construction sites, switching to upgrading");
+            self.enable_upgrading()
         }
 
         Ok(())
@@ -101,6 +107,8 @@ impl Creep {
 
     fn harvest(&self) -> Result<(), Error> {
         assert_eq!(self.role, Role::Harvesting);
+
+        debug!("Running harvest");
 
         let source = &self
             .inner
@@ -111,6 +119,8 @@ impl Creep {
             let r = self.inner.harvest(source);
             if r == ReturnCode::Ok {
                 if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0 {
+                    debug!("Full, switching to other mode!");
+
                     if screeps::game::construction_sites::values().is_empty() {
                         self.enable_upgrading()
                     } else {
@@ -130,6 +140,8 @@ impl Creep {
     fn upgrade(&self) -> Result<(), Error> {
         assert_eq!(self.role, Role::Upgrading);
 
+        debug!("Running upgrade");
+
         if let Some(c) = self
             .inner
             .room()
@@ -141,6 +153,7 @@ impl Creep {
                 self.inner.move_to(&c);
             } else if r == ReturnCode::Ok {
                 if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
+                    debug!("No energy left; switching to harvesting");
                     self.enable_harvesting();
                 }
             } else {

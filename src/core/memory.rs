@@ -14,7 +14,7 @@ pub fn cleanup_memory() -> Result<(), Box<dyn std::error::Error>> {
 
     for mem_name in screeps_memory.keys() {
         if !alive_creeps.contains(&mem_name) {
-            debug!("cleaning up creep memory of dead creep {}", mem_name);
+            trace!("cleaning up creep memory of dead creep {}", mem_name);
             screeps_memory.del(&mem_name);
         }
     }
