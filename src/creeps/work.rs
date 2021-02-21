@@ -129,17 +129,15 @@ impl Creep {
 
         debug!("Running build");
 
-        if let Some(c) = screeps::game::construction_sites::values().first() {
+        if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
+            debug!("No energy left; switching to harvesting");
+            self.enable_harvesting();
+        } else if let Some(c) = screeps::game::construction_sites::values().first() {
             let r = self.inner.build(&c);
             if r == ReturnCode::NotInRange {
                 // FIXME: Handle moving to other construction site
                 self.move_to(c)?;
-            } else if r == ReturnCode::Ok {
-                if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
-                    debug!("No energy left; switching to harvesting");
-                    self.enable_harvesting();
-                }
-            } else {
+            } else if r != ReturnCode::Ok {
                 return Err(Error::Build(r));
             }
         } else {
