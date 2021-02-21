@@ -163,7 +163,7 @@ impl Creep {
             if self.inner.pos().is_near_to(source) {
                 let r = self.inner.harvest(source);
                 if r == ReturnCode::Ok {
-                    if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0 {
+                    if self.inner.store_free_capacity(None) == 0 {
                         debug!("Full, switching to other mode!");
 
                         if !self.get_maintainable_structures().is_empty() {
