@@ -181,26 +181,27 @@ impl Creep {
             .expect("room is not visible to you")
             .find(find::SOURCES)
         {
-            if self.inner.pos().is_near_to(source) {
-                let r = self.inner.harvest(source);
-                if r == ReturnCode::Ok {
+            let r = self.inner.harvest(source);
+            match r {
+                ReturnCode::NotInRange => {
+                    debug!("Not in range for harvest, moving");
+                    let r = self.inner.move_to(source);
+                    match r {
+                        ReturnCode::Ok | ReturnCode::NoPath => Ok(()),
+                        _ => Err(Error::Move(r)),
+                    }
+                }
+                ReturnCode::Ok => {
+                    debug!("harvesting...");
                     if self.inner.store_free_capacity(None) == 0 {
                         debug!("Full, switching to other mode!");
 
                         self.reassing_harvest_role();
                     }
-
-                    break;
-                } else {
-                    return Err(Error::Harvest(r));
+                    Ok(())
                 }
-            } else {
-                let r = self.inner.move_to(source);
-                match r {
-                    ReturnCode::Ok | ReturnCode::NoPath => {}
-                    _ => return Err(Error::Move(r)),
-                }
-            }
+                _ => Err(Error::Harvest(r)),
+            }?
         }
 
         Ok(())
