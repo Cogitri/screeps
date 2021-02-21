@@ -168,7 +168,7 @@ impl Creep {
         debug!("Running harvest");
 
         if let Ok(ttl) = self.inner.ticks_to_live() {
-            if ttl > 50 {
+            if ttl < 50 {
                 debug!("About to die, switching to other mode!");
 
                 self.reassing_harvest_role();
