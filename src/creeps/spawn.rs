@@ -1,6 +1,6 @@
 use crate::core::constants;
 use log::*;
-use screeps::{prelude::*, Part, ReturnCode};
+use screeps::{prelude::*, Part, ResourceType, ReturnCode};
 
 pub fn replenish_creeps() -> Result<(), ReturnCode> {
     debug!("running spawns");
@@ -12,9 +12,22 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
 
     for spawn in screeps::game::spawns::values() {
         debug!("running spawn {}", spawn.name());
-        let body = [Part::Move, Part::Move, Part::Carry, Part::Work];
 
-        if spawn.energy() >= body.iter().map(|p| p.cost()).sum() {
+        if spawn.store_free_capacity(Some(ResourceType::Energy)) != 0 {
+            debug!("Waiting for spawn to be full to spawn big mob");
+            return Ok(());
+        }
+
+        let mut body = vec![Part::Move, Part::Move, Part::Carry, Part::Work];
+        let energy = spawn.energy();
+        let mut sum = body.iter().map(|p| p.cost()).sum();
+
+        while energy >= (sum + Part::Work.cost()) {
+            body.push(Part::Work);
+            sum = body.iter().map(|p| p.cost()).sum();
+        }
+
+        if energy >= sum {
             // create a unique name, spawn.
             let name_base = screeps::game::time();
             let mut additional = 0;
