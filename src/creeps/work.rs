@@ -177,7 +177,12 @@ impl Creep {
             .filter(|s| {
                 if let Some(a) = s.as_attackable() {
                     let hits = a.hits();
-                    if hits != 0 && hits < a.hits_max() {
+                    if hits != 0
+                        && hits
+                            < self.inner.store_capacity(Some(ResourceType::Energy))
+                                * constants::MAX_REPAIR_MULTIPLIER
+                        && hits < a.hits_max()
+                    {
                         return true;
                     }
                 }
