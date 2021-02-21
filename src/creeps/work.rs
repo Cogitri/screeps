@@ -10,6 +10,8 @@ pub enum Error {
     Harvest(ReturnCode),
     #[error("Couldn't maintain: `{0:?}`")]
     Maintain(ReturnCode),
+    #[error("Couldn't move: `{0:?}`")]
+    Move(ReturnCode),
     #[error("Creep has no controller!")]
     NoController(),
     #[error("Couldn't upgrade: `{0:?}`")]
@@ -29,8 +31,10 @@ struct Creep {
     role: Role,
 }
 
+type Result<T> = std::result::Result<T, crate::creeps::work::Error>;
+
 impl Creep {
-    pub fn do_action(&self) -> Result<(), Error> {
+    pub fn do_action(&self) -> Result<()> {
         debug!("running creep {}", self.inner.name());
 
         if self.inner.spawning() {
@@ -100,7 +104,7 @@ impl Creep {
         self.inner.memory().set("upgrading", true);
     }
 
-    fn build(&self) -> Result<(), Error> {
+    fn build(&self) -> Result<()> {
         assert_eq!(self.role, Role::Building);
 
         debug!("Running build");
@@ -108,7 +112,10 @@ impl Creep {
         if let Some(c) = screeps::game::construction_sites::values().first() {
             let r = self.inner.build(&c);
             if r == ReturnCode::NotInRange {
-                self.inner.move_to(c);
+                let r = self.inner.move_to(c);
+                if r != ReturnCode::Ok {
+                    return Err(Error::Move(r));
+                }
             } else if r == ReturnCode::Ok {
                 if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
                     debug!("No energy left; switching to harvesting");
@@ -142,7 +149,7 @@ impl Creep {
             .collect::<Vec<_>>()
     }
 
-    fn harvest(&self) -> Result<(), Error> {
+    fn harvest(&self) -> Result<()> {
         assert_eq!(self.role, Role::Harvesting);
 
         debug!("Running harvest");
@@ -173,33 +180,44 @@ impl Creep {
                 return Err(Error::Harvest(r));
             }
         } else {
-            self.inner.move_to(source);
-        }
-
-        Ok(())
-    }
-
-    fn maintain(&self) -> Result<(), Error> {
-        if let Some(target) = self.get_maintainable_structures().first() {
-            let r = self
-                .inner
-                .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
-            if r == ReturnCode::NotInRange {
-                self.inner.move_to(target);
-            } else if r == ReturnCode::Ok {
-                if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
-                    debug!("No energy left; switching to harvesting");
-                    self.enable_harvesting();
-                }
-            } else {
-                return Err(Error::Maintain(r));
+            let r = self.inner.move_to(source);
+            if r != ReturnCode::Ok {
+                return Err(Error::Move(r));
             }
         }
 
         Ok(())
     }
 
-    fn upgrade(&self) -> Result<(), Error> {
+    fn maintain(&self) -> Result<()> {
+        if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
+            debug!("No energy left; switching to harvesting");
+            self.enable_harvesting();
+        } else if let Some(target) = self.get_maintainable_structures().first() {
+            let r = self
+                .inner
+                .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
+            match r {
+                ReturnCode::NotInRange => {
+                    let r = self.inner.move_to(target);
+                    if r == ReturnCode::Ok {
+                        Ok(())
+                    } else {
+                        Err(Error::Move(r))
+                    }
+                }
+                ReturnCode::Ok => Ok(()),
+                _ => Err(Error::Maintain(r)),
+            }?
+        } else {
+            debug!("No energy left; switching to harvesting");
+            self.enable_harvesting();
+        }
+
+        Ok(())
+    }
+
+    fn upgrade(&self) -> Result<()> {
         assert_eq!(self.role, Role::Upgrading);
 
         debug!("Running upgrade");
@@ -211,16 +229,23 @@ impl Creep {
             .controller()
         {
             let r = self.inner.upgrade_controller(&c);
-            if r == ReturnCode::NotInRange {
-                self.inner.move_to(&c);
-            } else if r == ReturnCode::Ok {
-                if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
+            match r {
+                ReturnCode::NotInRange => {
+                    let r = self.inner.move_to(&c);
+                    if r == ReturnCode::Ok {
+                        Ok(())
+                    } else {
+                        Err(Error::Move(r))
+                    }
+                }
+                ReturnCode::NotEnough => {
                     debug!("No energy left; switching to harvesting");
                     self.enable_harvesting();
+                    Ok(())
                 }
-            } else {
-                return Err(Error::Upgrade(r));
-            }
+                ReturnCode::Ok => Ok(()),
+                _ => Err(Error::Upgrade(r)),
+            }?
         } else {
             return Err(Error::NoController());
         }
@@ -229,7 +254,7 @@ impl Creep {
     }
 }
 
-pub fn work() -> Result<(), Error> {
+pub fn work() -> Result<()> {
     debug!("running creeps");
 
     for s_creep in screeps::game::creeps::values() {
