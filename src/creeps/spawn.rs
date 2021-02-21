@@ -37,6 +37,8 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
             } else {
                 return Err(res);
             }
+        } else {
+            debug!("Not enough energy!");
         }
     }
 
