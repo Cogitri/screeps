@@ -5,7 +5,7 @@ use screeps::{prelude::*, Part, ReturnCode};
 pub fn replenish_creeps() -> Result<(), ReturnCode> {
     debug!("running spawns");
 
-    if screeps::game::creeps::keys().len() <= constants::MAX_CREEPS {
+    if screeps::game::creeps::keys().len() >= constants::MAX_CREEPS {
         debug!("Enough creeps spawned, not spawning more");
         return Ok(());
     }
