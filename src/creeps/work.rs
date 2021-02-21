@@ -15,6 +15,8 @@ pub enum Error {
     Move(ReturnCode),
     #[error("Creep has no controller!")]
     NoController(),
+    #[error("Couldn't repair: `{0:?}`")]
+    Repair(ReturnCode),
     #[error("Couldn't upgrade: `{0:?}`")]
     Upgrade(ReturnCode),
 }
@@ -24,6 +26,7 @@ enum Role {
     Building,
     Harvesting,
     Maintainer,
+    Repairing,
     Upgrading,
 }
 
@@ -46,6 +49,7 @@ impl Creep {
             Role::Building => self.build(),
             Role::Harvesting => self.harvest(),
             Role::Maintainer => self.maintain(),
+            Role::Repairing => self.repair(),
             Role::Upgrading => self.upgrade(),
         }
     }
@@ -60,6 +64,8 @@ impl Creep {
             Role::Maintainer
         } else if memory.bool(constants::ROLE_UPGRADING) {
             Role::Upgrading
+        } else if memory.bool(constants::ROLE_REPAIRING) {
+            Role::Repairing
         } else {
             error!("Unknown role, falling back to harvesting!");
             unimplemented!()
@@ -74,6 +80,7 @@ impl Creep {
         self.inner.memory().set(constants::ROLE_BUILDING, true);
         self.inner.memory().set(constants::ROLE_HARVESTING, false);
         self.inner.memory().set(constants::ROLE_MAINTAINING, false);
+        self.inner.memory().set(constants::ROLE_REPAIRING, false);
         self.inner.memory().set(constants::ROLE_UPGRADING, false);
     }
 
@@ -83,6 +90,7 @@ impl Creep {
         self.inner.memory().set(constants::ROLE_BUILDING, false);
         self.inner.memory().set(constants::ROLE_HARVESTING, false);
         self.inner.memory().set(constants::ROLE_MAINTAINING, true);
+        self.inner.memory().set(constants::ROLE_REPAIRING, false);
         self.inner.memory().set(constants::ROLE_UPGRADING, false);
     }
 
@@ -92,6 +100,17 @@ impl Creep {
         self.inner.memory().set(constants::ROLE_BUILDING, false);
         self.inner.memory().set(constants::ROLE_HARVESTING, true);
         self.inner.memory().set(constants::ROLE_MAINTAINING, false);
+        self.inner.memory().set(constants::ROLE_REPAIRING, false);
+        self.inner.memory().set(constants::ROLE_UPGRADING, false);
+    }
+
+    fn enable_repair(&self) {
+        assert_eq!(self.inner.say("Reparing!", false), ReturnCode::Ok);
+
+        self.inner.memory().set(constants::ROLE_BUILDING, false);
+        self.inner.memory().set(constants::ROLE_HARVESTING, false);
+        self.inner.memory().set(constants::ROLE_MAINTAINING, false);
+        self.inner.memory().set(constants::ROLE_REPAIRING, true);
         self.inner.memory().set(constants::ROLE_UPGRADING, false);
     }
 
@@ -101,6 +120,7 @@ impl Creep {
         self.inner.memory().set(constants::ROLE_BUILDING, false);
         self.inner.memory().set(constants::ROLE_HARVESTING, false);
         self.inner.memory().set(constants::ROLE_MAINTAINING, false);
+        self.inner.memory().set(constants::ROLE_REPAIRING, false);
         self.inner.memory().set(constants::ROLE_UPGRADING, true);
     }
 
@@ -112,10 +132,8 @@ impl Creep {
         if let Some(c) = screeps::game::construction_sites::values().first() {
             let r = self.inner.build(&c);
             if r == ReturnCode::NotInRange {
-                let r = self.inner.move_to(c);
-                if r != ReturnCode::Ok {
-                    return Err(Error::Move(r));
-                }
+                // FIXME: Handle moving to other construction site
+                self.move_to(c)?;
             } else if r == ReturnCode::Ok {
                 if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
                     debug!("No energy left; switching to harvesting");
@@ -146,11 +164,32 @@ impl Creep {
                         .store_free_capacity(Some(ResourceType::Energy))
                         > 50
             })
-            .collect::<Vec<_>>()
+            .collect()
+    }
+
+    fn get_repairable_structures(&self) -> Vec<Structure> {
+        self.inner
+            .room()
+            .expect("room is not visible to you")
+            .find(find::STRUCTURES)
+            .into_iter()
+            .filter(|s| {
+                if let Some(a) = s.as_attackable() {
+                    let hits = a.hits();
+                    if hits != 0 && hits < a.hits_max() {
+                        return true;
+                    }
+                }
+                false
+            })
+            .collect()
     }
 
     fn reassing_harvest_role(&self) {
-        if !self.get_maintainable_structures().is_empty() {
+        if !self.get_repairable_structures().is_empty() {
+            debug!("Switching to reparing since there are repairable structures");
+            self.enable_repair()
+        } else if !self.get_maintainable_structures().is_empty() {
             debug!("Switching to maintaining since there are maintainable structures");
             self.enable_maintaining()
         } else if !screeps::game::construction_sites::values().is_empty() {
@@ -185,12 +224,7 @@ impl Creep {
             let con = match r {
                 ReturnCode::NotInRange => {
                     debug!("Not in range for harvest, moving");
-                    let r = self.inner.move_to(source);
-                    match r {
-                        ReturnCode::Ok => Ok(false),
-                        ReturnCode::NoPath => Ok(true),
-                        _ => Err(Error::Move(r)),
-                    }
+                    self.move_to(source)
                 }
                 ReturnCode::Ok => {
                     debug!("harvesting...");
@@ -213,6 +247,15 @@ impl Creep {
         Ok(())
     }
 
+    fn move_to<T: ?Sized + HasPosition>(&self, target: &T) -> Result<bool> {
+        let r = self.inner.move_to(target);
+        match r {
+            ReturnCode::Ok => Ok(false),
+            ReturnCode::NoPath => Ok(true),
+            _ => Err(Error::Move(r)),
+        }
+    }
+
     fn maintain(&self) -> Result<()> {
         if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
             debug!("No energy left; switching to harvesting");
@@ -222,17 +265,35 @@ impl Creep {
                 .inner
                 .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
             match r {
-                ReturnCode::NotInRange => {
-                    let r = self.inner.move_to(target);
-                    if r == ReturnCode::Ok {
-                        Ok(())
-                    } else {
-                        Err(Error::Move(r))
-                    }
-                }
-                ReturnCode::Ok => Ok(()),
+                // FIXME: If we can't find a path to the first structure we should try the next one
+                ReturnCode::NotInRange => self.move_to(target),
+                ReturnCode::Ok => Ok(false),
                 _ => Err(Error::Maintain(r)),
-            }?
+            }?;
+        } else {
+            debug!("No target left; switching to harvesting");
+            self.enable_harvesting();
+        }
+
+        Ok(())
+    }
+
+    fn repair(&self) -> Result<()> {
+        assert_eq!(self.role, Role::Repairing);
+
+        debug!("Running repair");
+
+        if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
+            debug!("No energy left; switching to harvesting");
+            self.enable_harvesting();
+        } else if let Some(c) = self.get_repairable_structures().first() {
+            let r = self.inner.repair(c);
+            match r {
+                // FIXME: Handle not being able to reach it
+                ReturnCode::NotInRange => self.move_to(c),
+                ReturnCode::Ok => Ok(false),
+                _ => Err(Error::Repair(r)),
+            }?;
         } else {
             debug!("No target left; switching to harvesting");
             self.enable_harvesting();
@@ -254,22 +315,15 @@ impl Creep {
         {
             let r = self.inner.upgrade_controller(&c);
             match r {
-                ReturnCode::NotInRange => {
-                    let r = self.inner.move_to(&c);
-                    if r == ReturnCode::Ok {
-                        Ok(())
-                    } else {
-                        Err(Error::Move(r))
-                    }
-                }
+                ReturnCode::NotInRange => self.move_to(&c),
                 ReturnCode::NotEnough => {
                     debug!("No energy left; switching to harvesting");
                     self.enable_harvesting();
-                    Ok(())
+                    Ok(false)
                 }
-                ReturnCode::Ok => Ok(()),
+                ReturnCode::Ok => Ok(false),
                 _ => Err(Error::Upgrade(r)),
-            }?
+            }?;
         } else {
             return Err(Error::NoController());
         }
