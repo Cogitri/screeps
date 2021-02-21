@@ -154,35 +154,42 @@ impl Creep {
 
         debug!("Running harvest");
 
-        let source = &self
+        for source in &self
             .inner
             .room()
             .expect("room is not visible to you")
-            .find(find::SOURCES)[0];
-        if self.inner.pos().is_near_to(source) {
-            let r = self.inner.harvest(source);
-            if r == ReturnCode::Ok {
-                if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0 {
-                    debug!("Full, switching to other mode!");
+            .find(find::SOURCES)
+        {
+            if self.inner.pos().is_near_to(source) {
+                let r = self.inner.harvest(source);
+                if r == ReturnCode::Ok {
+                    if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0 {
+                        debug!("Full, switching to other mode!");
 
-                    if !self.get_maintainable_structures().is_empty() {
-                        debug!("Switching to maintaining since there are maintainable structures");
-                        self.enable_maintaining()
-                    } else if screeps::game::construction_sites::values().is_empty() {
-                        debug!("Switching to upgrading since there are no construction sites");
-                        self.enable_upgrading()
-                    } else {
-                        debug!("Switching to building");
-                        self.enable_building()
+                        if !self.get_maintainable_structures().is_empty() {
+                            debug!(
+                                "Switching to maintaining since there are maintainable structures"
+                            );
+                            self.enable_maintaining()
+                        } else if screeps::game::construction_sites::values().is_empty() {
+                            debug!("Switching to upgrading since there are no construction sites");
+                            self.enable_upgrading()
+                        } else {
+                            debug!("Switching to building");
+                            self.enable_building()
+                        }
                     }
+
+                    break;
+                } else {
+                    return Err(Error::Harvest(r));
                 }
             } else {
-                return Err(Error::Harvest(r));
-            }
-        } else {
-            let r = self.inner.move_to(source);
-            if r != ReturnCode::Ok {
-                return Err(Error::Move(r));
+                let r = self.inner.move_to(source);
+                match r {
+                    ReturnCode::Ok | ReturnCode::NoPath => {}
+                    _ => return Err(Error::Move(r)),
+                }
             }
         }
 
