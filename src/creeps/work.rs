@@ -1,3 +1,4 @@
+use crate::core::constants;
 use log::*;
 use screeps::{constants::StructureType, find, prelude::*, ResourceType, ReturnCode, Structure};
 use thiserror::Error;
@@ -51,18 +52,17 @@ impl Creep {
 
     pub fn from_creep(inner: screeps::Creep) -> Self {
         let memory = inner.memory();
-        let role = if memory.bool("building") {
+        let role = if memory.bool(constants::ROLE_BUILDING) {
             Role::Building
-        } else if memory.bool("harvesting") {
+        } else if memory.bool(constants::ROLE_HARVESTING) {
             Role::Harvesting
-        } else if memory.bool("maintainer") {
+        } else if memory.bool(constants::ROLE_MAINTAINING) {
             Role::Maintainer
-        } else if memory.bool("upgrading") {
+        } else if memory.bool(constants::ROLE_UPGRADING) {
             Role::Upgrading
         } else {
-            warn!("Unknown role, falling back to harvesting!");
-            memory.set("harvesting", true);
-            Role::Harvesting
+            error!("Unknown role, falling back to harvesting!");
+            unimplemented!()
         };
 
         Self { inner, role }
@@ -71,37 +71,37 @@ impl Creep {
     fn enable_building(&self) {
         assert_eq!(self.inner.say("Building!", false), ReturnCode::Ok);
 
-        self.inner.memory().set("building", true);
-        self.inner.memory().set("harvesting", false);
-        self.inner.memory().set("maintaining", false);
-        self.inner.memory().set("upgrading", false);
+        self.inner.memory().set(constants::ROLE_BUILDING, true);
+        self.inner.memory().set(constants::ROLE_HARVESTING, false);
+        self.inner.memory().set(constants::ROLE_MAINTAINING, false);
+        self.inner.memory().set(constants::ROLE_UPGRADING, false);
     }
 
     fn enable_maintaining(&self) {
         assert_eq!(self.inner.say("Maintaining!", false), ReturnCode::Ok);
 
-        self.inner.memory().set("building", false);
-        self.inner.memory().set("harvesting", false);
-        self.inner.memory().set("maintaining", true);
-        self.inner.memory().set("upgrading", false);
+        self.inner.memory().set(constants::ROLE_BUILDING, false);
+        self.inner.memory().set(constants::ROLE_HARVESTING, false);
+        self.inner.memory().set(constants::ROLE_MAINTAINING, true);
+        self.inner.memory().set(constants::ROLE_UPGRADING, false);
     }
 
     fn enable_harvesting(&self) {
         assert_eq!(self.inner.say("Harvesting!", false), ReturnCode::Ok);
 
-        self.inner.memory().set("building", false);
-        self.inner.memory().set("harvesting", true);
-        self.inner.memory().set("maintaining", false);
-        self.inner.memory().set("upgrading", false);
+        self.inner.memory().set(constants::ROLE_BUILDING, false);
+        self.inner.memory().set(constants::ROLE_HARVESTING, true);
+        self.inner.memory().set(constants::ROLE_MAINTAINING, false);
+        self.inner.memory().set(constants::ROLE_UPGRADING, false);
     }
 
     fn enable_upgrading(&self) {
         assert_eq!(self.inner.say("Upgrading!", false), ReturnCode::Ok);
 
-        self.inner.memory().set("building", false);
-        self.inner.memory().set("harvesting", false);
-        self.inner.memory().set("maintaining", false);
-        self.inner.memory().set("upgrading", true);
+        self.inner.memory().set(constants::ROLE_BUILDING, false);
+        self.inner.memory().set(constants::ROLE_HARVESTING, false);
+        self.inner.memory().set(constants::ROLE_MAINTAINING, false);
+        self.inner.memory().set(constants::ROLE_UPGRADING, true);
     }
 
     fn build(&self) -> Result<()> {
@@ -227,7 +227,7 @@ impl Creep {
                 _ => Err(Error::Maintain(r)),
             }?
         } else {
-            debug!("No energy left; switching to harvesting");
+            debug!("No target left; switching to harvesting");
             self.enable_harvesting();
         }
 

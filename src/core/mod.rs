@@ -1,3 +1,4 @@
+pub mod constants;
 pub mod game_loop;
 pub mod logging;
 pub mod memory;
