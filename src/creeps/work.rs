@@ -1,5 +1,5 @@
 use log::*;
-use screeps::{find, prelude::*, ResourceType, ReturnCode};
+use screeps::{constants::StructureType, find, prelude::*, ResourceType, ReturnCode, Structure};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -8,6 +8,8 @@ pub enum Error {
     Build(ReturnCode),
     #[error("Couldn't harvest: `{0:?}`")]
     Harvest(ReturnCode),
+    #[error("Couldn't maintain: `{0:?}`")]
+    Maintain(ReturnCode),
     #[error("Creep has no controller!")]
     NoController(),
     #[error("Couldn't upgrade: `{0:?}`")]
@@ -18,6 +20,7 @@ pub enum Error {
 enum Role {
     Building,
     Harvesting,
+    Maintainer,
     Upgrading,
 }
 
@@ -37,6 +40,7 @@ impl Creep {
         match self.role {
             Role::Building => self.build(),
             Role::Harvesting => self.harvest(),
+            Role::Maintainer => self.maintain(),
             Role::Upgrading => self.upgrade(),
         }
     }
@@ -47,6 +51,8 @@ impl Creep {
             Role::Building
         } else if memory.bool("harvesting") {
             Role::Harvesting
+        } else if memory.bool("maintainer") {
+            Role::Maintainer
         } else if memory.bool("upgrading") {
             Role::Upgrading
         } else {
@@ -61,6 +67,16 @@ impl Creep {
 
         self.inner.memory().set("building", true);
         self.inner.memory().set("harvesting", false);
+        self.inner.memory().set("maintaining", false);
+        self.inner.memory().set("upgrading", false);
+    }
+
+    fn enable_maintaining(&self) {
+        assert_eq!(self.inner.say("Maintaining!", false), ReturnCode::Ok);
+
+        self.inner.memory().set("building", false);
+        self.inner.memory().set("harvesting", false);
+        self.inner.memory().set("maintaining", true);
         self.inner.memory().set("upgrading", false);
     }
 
@@ -69,6 +85,7 @@ impl Creep {
 
         self.inner.memory().set("building", false);
         self.inner.memory().set("harvesting", true);
+        self.inner.memory().set("maintaining", false);
         self.inner.memory().set("upgrading", false);
     }
 
@@ -77,6 +94,7 @@ impl Creep {
 
         self.inner.memory().set("building", false);
         self.inner.memory().set("harvesting", false);
+        self.inner.memory().set("maintaining", false);
         self.inner.memory().set("upgrading", true);
     }
 
@@ -105,6 +123,23 @@ impl Creep {
         Ok(())
     }
 
+    fn get_maintainable_structures(&self) -> Vec<Structure> {
+        self.inner
+            .room()
+            .unwrap()
+            .find(screeps::constants::find::STRUCTURES)
+            .into_iter()
+            .filter(|s| {
+                let typ = s.structure_type();
+                (typ == StructureType::Extension || typ == StructureType::Spawn)
+                    && s.as_has_store()
+                        .unwrap()
+                        .store_free_capacity(Some(ResourceType::Energy))
+                        > 50
+            })
+            .collect::<Vec<_>>()
+    }
+
     fn harvest(&self) -> Result<(), Error> {
         assert_eq!(self.role, Role::Harvesting);
 
@@ -121,9 +156,14 @@ impl Creep {
                 if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0 {
                     debug!("Full, switching to other mode!");
 
-                    if screeps::game::construction_sites::values().is_empty() {
+                    if !self.get_maintainable_structures().is_empty() {
+                        debug!("Switching to maintaining since there are maintainable structures");
+                        self.enable_maintaining()
+                    } else if screeps::game::construction_sites::values().is_empty() {
+                        debug!("Switching to upgrading since there are no construction sites");
                         self.enable_upgrading()
                     } else {
+                        debug!("Switching to building");
                         self.enable_building()
                     }
                 }
@@ -132,6 +172,26 @@ impl Creep {
             }
         } else {
             self.inner.move_to(source);
+        }
+
+        Ok(())
+    }
+
+    fn maintain(&self) -> Result<(), Error> {
+        if let Some(target) = self.get_maintainable_structures().first() {
+            let r = self
+                .inner
+                .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
+            if r == ReturnCode::NotInRange {
+                self.inner.move_to(target);
+            } else if r == ReturnCode::Ok {
+                if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
+                    debug!("No energy left; switching to harvesting");
+                    self.enable_harvesting();
+                }
+            } else {
+                return Err(Error::Maintain(r));
+            }
         }
 
         Ok(())
