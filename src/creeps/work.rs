@@ -153,7 +153,7 @@ impl Creep {
     fn get_maintainable_structures(&self) -> Vec<Structure> {
         self.inner
             .room()
-            .unwrap()
+            .expect("room is not visible to you")
             .find(screeps::constants::find::STRUCTURES)
             .into_iter()
             .filter(|s| {
@@ -168,7 +168,8 @@ impl Creep {
     }
 
     fn get_repairable_structures(&self) -> Vec<Structure> {
-        self.inner
+        let mut v = self
+            .inner
             .room()
             .expect("room is not visible to you")
             .find(find::STRUCTURES)
@@ -182,7 +183,16 @@ impl Creep {
                 }
                 false
             })
-            .collect()
+            .collect::<Vec<_>>();
+
+        v.sort_by(|a, b| {
+            a.as_attackable()
+                .unwrap()
+                .hits()
+                .cmp(&b.as_attackable().unwrap().hits())
+        });
+
+        v
     }
 
     fn reassing_harvest_role(&self) {
