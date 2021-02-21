@@ -1,8 +1,14 @@
+use crate::core::constants;
 use log::*;
 use screeps::{prelude::*, Part, ReturnCode};
 
 pub fn replenish_creeps() -> Result<(), ReturnCode> {
     debug!("running spawns");
+
+    if screeps::game::creeps::keys().len() <= constants::MAX_CREEPS {
+        debug!("Enough creeps spawned, not spawning more");
+        return Ok(());
+    }
 
     for spawn in screeps::game::spawns::values() {
         debug!("running spawn {}", spawn.name());
