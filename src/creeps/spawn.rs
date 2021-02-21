@@ -12,18 +12,23 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
             // create a unique name, spawn.
             let name_base = screeps::game::time();
             let mut additional = 0;
-            let res = loop {
+            let (name, res) = loop {
                 let name = format!("{}-{}", name_base, additional);
                 let res = spawn.spawn_creep(&body, &name);
 
                 if res == ReturnCode::NameExists {
                     additional += 1;
                 } else {
-                    break res;
+                    break (name, res);
                 }
             };
 
-            if res != ReturnCode::Ok {
+            if res == ReturnCode::Ok {
+                screeps::game::creeps::get(&name)
+                    .unwrap()
+                    .memory()
+                    .set("harvesting", true);
+            } else {
                 return Err(res);
             }
         }
