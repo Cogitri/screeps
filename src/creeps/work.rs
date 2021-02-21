@@ -56,7 +56,9 @@ impl Creep {
         } else if memory.bool("upgrading") {
             Role::Upgrading
         } else {
-            unimplemented!()
+            warn!("Unknown role, falling back to harvesting!");
+            memory.set("harvesting", true);
+            Role::Harvesting
         };
 
         Self { inner, role }
