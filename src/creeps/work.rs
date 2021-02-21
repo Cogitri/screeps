@@ -182,12 +182,13 @@ impl Creep {
             .find(find::SOURCES)
         {
             let r = self.inner.harvest(source);
-            match r {
+            let con = match r {
                 ReturnCode::NotInRange => {
                     debug!("Not in range for harvest, moving");
                     let r = self.inner.move_to(source);
                     match r {
-                        ReturnCode::Ok | ReturnCode::NoPath => Ok(()),
+                        ReturnCode::Ok => Ok(false),
+                        ReturnCode::NoPath => Ok(true),
                         _ => Err(Error::Move(r)),
                     }
                 }
@@ -198,10 +199,15 @@ impl Creep {
 
                         self.reassing_harvest_role();
                     }
-                    Ok(())
+                    Ok(false)
                 }
                 _ => Err(Error::Harvest(r)),
-            }?
+            }?;
+
+            // Only try the next source if there's no path to this source
+            if !con {
+                break;
+            }
         }
 
         Ok(())
