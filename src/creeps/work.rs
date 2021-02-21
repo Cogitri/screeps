@@ -149,10 +149,31 @@ impl Creep {
             .collect::<Vec<_>>()
     }
 
+    fn reassing_harvest_role(&self) {
+        if !self.get_maintainable_structures().is_empty() {
+            debug!("Switching to maintaining since there are maintainable structures");
+            self.enable_maintaining()
+        } else if !screeps::game::construction_sites::values().is_empty() {
+            debug!("Switching to building");
+            self.enable_building()
+        } else {
+            debug!("Switching to upgrading since there are no construction sites");
+            self.enable_upgrading()
+        }
+    }
+
     fn harvest(&self) -> Result<()> {
         assert_eq!(self.role, Role::Harvesting);
 
         debug!("Running harvest");
+
+        if let Ok(ttl) = self.inner.ticks_to_live() {
+            if ttl > 50 {
+                debug!("About to die, switching to other mode!");
+
+                self.reassing_harvest_role();
+            }
+        }
 
         for source in &self
             .inner
@@ -166,18 +187,7 @@ impl Creep {
                     if self.inner.store_free_capacity(None) == 0 {
                         debug!("Full, switching to other mode!");
 
-                        if !self.get_maintainable_structures().is_empty() {
-                            debug!(
-                                "Switching to maintaining since there are maintainable structures"
-                            );
-                            self.enable_maintaining()
-                        } else if screeps::game::construction_sites::values().is_empty() {
-                            debug!("Switching to upgrading since there are no construction sites");
-                            self.enable_upgrading()
-                        } else {
-                            debug!("Switching to building");
-                            self.enable_building()
-                        }
+                        self.reassing_harvest_role();
                     }
 
                     break;
