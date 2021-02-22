@@ -1,6 +1,9 @@
 use crate::core::constants;
 use log::*;
-use screeps::{constants::StructureType, find, prelude::*, ResourceType, ReturnCode, Structure};
+use screeps::{
+    constants::StructureType, find, prelude::*, ConstructionSite, ResourceType, ReturnCode,
+    Structure,
+};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -132,7 +135,7 @@ impl Creep {
         if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
             debug!("No energy left; switching to harvesting");
             self.enable_harvesting();
-        } else if let Some(c) = screeps::game::construction_sites::values().first() {
+        } else if let Some(c) = self.get_buildable_structures().first() {
             let r = self.inner.build(&c);
             if r == ReturnCode::NotInRange {
                 // FIXME: Handle moving to other construction site
@@ -148,8 +151,26 @@ impl Creep {
         Ok(())
     }
 
+    fn get_buildable_structures(&self) -> Vec<ConstructionSite> {
+        let mut v = self
+            .inner
+            .room()
+            .expect("room is not visible to you")
+            .find(screeps::constants::find::CONSTRUCTION_SITES);
+
+        v.sort_by(|a, b| {
+            self.inner
+                .pos()
+                .get_range_to(a)
+                .cmp(&self.inner.pos().get_range_to(b))
+        });
+
+        v
+    }
+
     fn get_maintainable_structures(&self) -> Vec<Structure> {
-        self.inner
+        let mut v: Vec<Structure> = self
+            .inner
             .room()
             .expect("room is not visible to you")
             .find(screeps::constants::find::STRUCTURES)
@@ -162,7 +183,16 @@ impl Creep {
                         .store_free_capacity(Some(ResourceType::Energy))
                         != 0
             })
-            .collect()
+            .collect();
+
+        v.sort_by(|a, b| {
+            self.inner
+                .pos()
+                .get_range_to(a)
+                .cmp(&self.inner.pos().get_range_to(b))
+        });
+
+        v
     }
 
     fn get_repairable_structures(&self) -> Vec<Structure> {
