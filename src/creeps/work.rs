@@ -81,6 +81,14 @@ impl Creep {
             {
                 offer.taken = true;
 
+                match offer.job {
+                    Job::Build(_) => self.inner.say("Switching to building", false),
+                    Job::Harvest(_) => self.inner.say("Switching to harvesting", false),
+                    Job::Maintain(_) => self.inner.say("Switching to maintaining", false),
+                    Job::Repair(_) => self.inner.say("Switching to repairing", false),
+                    Job::Upgrade(_) => self.inner.say("Switching to upgrading", false),
+                };
+
                 if self.execute_job(&offer.job)? {
                     self.current_job = Some(offer.job.clone());
                 }
