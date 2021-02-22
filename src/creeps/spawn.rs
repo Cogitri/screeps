@@ -2,6 +2,37 @@ use crate::core::constants;
 use log::*;
 use screeps::{prelude::*, Part, ReturnCode};
 
+struct BodyParts {
+    mode: u8,
+}
+
+impl BodyParts {
+    pub fn new() -> Self {
+        Self { mode: 0 }
+    }
+}
+
+impl Iterator for BodyParts {
+    type Item = Part;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.mode {
+            3 => {
+                self.mode += 1;
+                Some(Part::Carry)
+            }
+            4 => {
+                self.mode = 0;
+                Some(Part::Move)
+            }
+            _ => {
+                self.mode += 1;
+                Some(Part::Work)
+            }
+        }
+    }
+}
+
 pub fn replenish_creeps() -> Result<(), ReturnCode> {
     debug!("running spawns");
 
@@ -29,10 +60,13 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
         let mut body = vec![Part::Move, Part::Move, Part::Carry, Part::Work];
         let energy = room.energy_available();
         let mut sum = body.iter().map(|p| p.cost()).sum();
+        let mut iter = BodyParts::new();
+        let mut next = iter.next().unwrap();
 
-        while energy >= (sum + Part::Work.cost()) {
-            body.push(Part::Work);
+        while energy >= (sum + next.cost()) {
+            body.push(next);
             sum = body.iter().map(|p| p.cost()).sum();
+            next = iter.next().unwrap();
         }
 
         if energy >= sum {
