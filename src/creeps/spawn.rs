@@ -1,6 +1,6 @@
 use crate::core::constants;
 use log::*;
-use screeps::{prelude::*, Part, ResourceType, ReturnCode};
+use screeps::{prelude::*, Part, ReturnCode};
 
 pub fn replenish_creeps() -> Result<(), ReturnCode> {
     debug!("running spawns");
@@ -13,7 +13,12 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
     for spawn in screeps::game::spawns::values() {
         debug!("running spawn {}", spawn.name());
 
-        if spawn.store_free_capacity(Some(ResourceType::Energy)) != 0 {
+        if spawn.room().expect("room isn't visible").energy_available()
+            < spawn
+                .room()
+                .expect("room isn't visible")
+                .energy_capacity_available()
+        {
             debug!("Waiting for spawn to be full to spawn big mob");
             return Ok(());
         }
