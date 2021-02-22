@@ -27,7 +27,7 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
         }
 
         let mut body = vec![Part::Move, Part::Move, Part::Carry, Part::Work];
-        let energy = spawn.energy();
+        let energy = room.energy_available();
         let mut sum = body.iter().map(|p| p.cost()).sum();
 
         while energy >= (sum + Part::Work.cost()) {
@@ -59,7 +59,7 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
                 return Err(res);
             }
         } else {
-            debug!("Not enough energy!");
+            warn!("Not enough energy!");
         }
     }
 
