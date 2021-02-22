@@ -13,12 +13,15 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
     for spawn in screeps::game::spawns::values() {
         debug!("running spawn {}", spawn.name());
 
-        if spawn.room().expect("room isn't visible").energy_available()
-            < spawn
-                .room()
-                .expect("room isn't visible")
-                .energy_capacity_available()
-        {
+        let room = spawn.room().expect("room isn't visible");
+
+        info!(
+            "room available energy: {}, capacity: {}",
+            room.energy_available(),
+            room.energy_capacity_available()
+        );
+
+        if room.energy_available() < room.energy_capacity_available() {
             debug!("Waiting for spawn to be full to spawn big mob");
             return Ok(());
         }
