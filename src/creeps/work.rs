@@ -264,6 +264,10 @@ impl Creep {
         let r = self.inner.move_to(target);
         match r {
             ReturnCode::Ok => Ok(false),
+            ReturnCode::Tired => {
+                debug!("Didn't move because tired!");
+                Ok(false)
+            }
             ReturnCode::NoPath => Ok(true),
             _ => Err(Error::Move(r)),
         }
