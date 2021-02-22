@@ -160,7 +160,7 @@ impl Creep {
                     && s.as_has_store()
                         .unwrap()
                         .store_free_capacity(Some(ResourceType::Energy))
-                        > 50
+                        != 0
             })
             .collect()
     }
