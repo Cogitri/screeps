@@ -1,4 +1,5 @@
 use super::{Job, JobOffer};
+use crate::core::constants;
 use log::*;
 use screeps::{prelude::*, ResourceType, ReturnCode};
 use thiserror::Error;
@@ -45,34 +46,51 @@ impl Creep {
     }
 
     pub fn select_job(&mut self, jobs: &mut [JobOffer]) -> Result<()> {
+        debug!(
+            "creep {} has {} jobs to choose from",
+            self.inner.name(),
+            jobs.len()
+        );
+
         if let Some(job) = &self.current_job {
+            debug!("Keeping job");
             if !self.execute_job(job)? {
                 self.current_job = None;
             }
         } else {
+            debug!("Changing job");
             let pos = self.inner.pos();
 
             if let Some(offer) = jobs
                 .iter_mut()
-                .filter(|a| !a.taken)
                 .filter(|a| {
-                    if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0
+                    if let Job::Repair(c) = &a.job {
+                        debug!(
+                            "Repair: {} hits vs {} capacity",
+                            c.as_attackable().unwrap().hits(),
+                            self.inner.store_capacity(Some(ResourceType::Energy))
+                                * constants::MAX_REPAIR_MULTIPLIER
+                        );
+                        return c.as_attackable().unwrap().hits()
+                            < self.inner.store_capacity(Some(ResourceType::Energy))
+                                * constants::MAX_REPAIR_MULTIPLIER;
+                    } else if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0
                         || self.inner.ticks_to_live().unwrap_or(0) < 50
                     {
                         if let Job::Harvest(_) = a.job {
-                            false
-                        } else {
-                            true
+                            debug!("Rejecting job because harvest and no free energy storage");
+                            return false;
                         }
                     } else if self.inner.store_used_capacity(Some(ResourceType::Energy)) == 0 {
                         if let Job::Harvest(_) = a.job {
-                            true
+                            return true;
                         } else {
-                            false
+                            debug!("Rejecting job because no energy and not harvest job");
+                            return false;
                         }
-                    } else {
-                        true
                     }
+
+                    true
                 })
                 .min_by(|a, b| {
                     (a.job.priority() * a.job.get_range_to(pos))
@@ -82,11 +100,11 @@ impl Creep {
                 offer.taken = true;
 
                 match offer.job {
-                    Job::Build(_) => self.inner.say("Switching to building", false),
-                    Job::Harvest(_) => self.inner.say("Switching to harvesting", false),
-                    Job::Maintain(_) => self.inner.say("Switching to maintaining", false),
-                    Job::Repair(_) => self.inner.say("Switching to repairing", false),
-                    Job::Upgrade(_) => self.inner.say("Switching to upgrading", false),
+                    Job::Build(_) => self.inner.say("building", false),
+                    Job::Harvest(_) => self.inner.say("harvesting", false),
+                    Job::Maintain(_) => self.inner.say("maintaining", false),
+                    Job::Repair(_) => self.inner.say("repairing", false),
+                    Job::Upgrade(_) => self.inner.say("upgrading", false),
                 };
 
                 if self.execute_job(&offer.job)? {
@@ -109,6 +127,11 @@ impl Creep {
         }
 
         let site = job.get_construction_site();
+
+        if site.progress() == site.progress_total() {
+            debug!("Building done, abandoning build job!");
+            return Ok(false);
+        }
 
         let r = self.inner.build(site);
 
@@ -172,13 +195,10 @@ impl Creep {
             .inner
             .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
         match r {
-            // FIXME: If we can't find a path to the first structure we should try the next one
-            ReturnCode::NotInRange => self.move_to(target),
+            ReturnCode::NotInRange => Ok(!self.move_to(target)?),
             ReturnCode::Ok => Ok(false),
             _ => Err(Error::Maintain(r)),
-        }?;
-
-        Ok(true)
+        }
     }
 
     fn repair(&self, job: &Job) -> Result<bool> {
@@ -190,6 +210,11 @@ impl Creep {
         }
 
         let target = job.get_structure();
+        let attackable = target.as_attackable().unwrap();
+        if attackable.hits() == attackable.hits_max() {
+            return Ok(false);
+        }
+
         let r = self.inner.repair(target);
         match r {
             // FIXME: Handle not being able to reach it

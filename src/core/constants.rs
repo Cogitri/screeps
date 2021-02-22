@@ -1,4 +1,5 @@
 pub static MAX_CREEPS: usize = 5;
+pub static MAX_REPAIR_MULTIPLIER: u32 = 4;
 pub static PRIORITY_BUILDING: u32 = 3;
 pub static PRIORITY_HARVESTING: u32 = 5;
 pub static PRIORITY_MAINTAINING: u32 = 2;
