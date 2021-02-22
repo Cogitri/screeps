@@ -1,5 +1,5 @@
 use super::cleanup_memory;
-use crate::creeps::{replenish_creeps, work};
+use crate::creeps::{replenish_creeps, Regulator};
 use log::*;
 
 pub fn game_loop() {
@@ -9,8 +9,10 @@ pub fn game_loop() {
         warn!("couldn't spawn: {:?}", e);
     }
 
-    if let Err(e) = work() {
-        warn!("{}", e);
+    for room in screeps::game::rooms::values() {
+        if let Err(e) = Regulator::new(room).distribute_creeps() {
+            warn!("{}", e);
+        }
     }
 
     let time = screeps::game::time();
