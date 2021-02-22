@@ -33,12 +33,12 @@ impl Iterator for BodyParts {
     }
 }
 
-pub fn replenish_creeps() -> Result<(), ReturnCode> {
+pub fn replenish_creeps() -> Result<bool, ReturnCode> {
     debug!("running spawns");
 
     if screeps::game::creeps::keys().len() >= constants::MAX_CREEPS {
         debug!("Enough creeps spawned, not spawning more");
-        return Ok(());
+        return Ok(false);
     }
 
     for spawn in screeps::game::spawns::values() {
@@ -54,7 +54,7 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
 
         if room.energy_available() < room.energy_capacity_available() {
             debug!("Waiting for spawn to be full to spawn big mob");
-            return Ok(());
+            return Ok(false);
         }
 
         let mut body = vec![Part::Move, Part::Move, Part::Carry, Part::Work];
@@ -73,22 +73,19 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
             // create a unique name, spawn.
             let name_base = screeps::game::time();
             let mut additional = 0;
-            let (name, res) = loop {
+            let res = loop {
                 let name = format!("{}-{}", name_base, additional);
                 let res = spawn.spawn_creep(&body, &name);
 
                 if res == ReturnCode::NameExists {
                     additional += 1;
                 } else {
-                    break (name, res);
+                    break res;
                 }
             };
 
             if res == ReturnCode::Ok {
-                screeps::game::creeps::get(&name)
-                    .unwrap()
-                    .memory()
-                    .set("harvesting", true);
+                return Ok(true);
             } else {
                 return Err(res);
             }
@@ -97,5 +94,5 @@ pub fn replenish_creeps() -> Result<(), ReturnCode> {
         }
     }
 
-    Ok(())
+    Ok(false)
 }

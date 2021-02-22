@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 stdweb = "0.4"
+lazy_static = "1.4"
 log = "0.4"
 fern = "0.6"
 screeps-game-api = "0.8"

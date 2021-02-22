@@ -1,6 +1,7 @@
 use super::{Creep, Job, JobOffer};
 use log::*;
 use screeps::{constants::StructureType, find, prelude::*, ResourceType, Room};
+use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -12,24 +13,52 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Regulator {
+    creeps: HashMap<String, Creep>,
     jobs: Vec<JobOffer>,
     room: Room,
 }
 
 impl Regulator {
-    pub fn distribute_creeps(&mut self) -> Result<()> {
-        // FIXME: We probably don't have to run this every tick!
-        self.scan();
+    pub fn distribute_creeps(&mut self, respawned: bool) -> Result<()> {
+        let creeps = screeps::game::creeps::values();
 
-        for creep in screeps::game::creeps::values() {
-            Creep::from_creep(creep).select_job(&mut self.jobs)?
+        if respawned {
+            // Remove dead creeps
+            self.creeps = self
+                .creeps
+                .drain()
+                .filter(|(name, _)| {
+                    let mut found = false;
+                    for x in &creeps {
+                        found = name == &x.name();
+                        if found {
+                            break;
+                        }
+                    }
+                    !found
+                })
+                .collect();
+        }
+
+        for creep in creeps {
+            self.creeps
+                .entry(creep.name())
+                .or_insert(Creep::from_creep(creep))
+                .select_job(&mut self.jobs)?
         }
 
         Ok(())
     }
 
     pub fn new(room: Room) -> Self {
+        let mut m = HashMap::new();
+
+        for creep in screeps::game::creeps::values() {
+            m.insert(creep.name(), Creep::from_creep(creep));
+        }
+
         Self {
+            creeps: m,
             jobs: Vec::new(),
             room,
         }
