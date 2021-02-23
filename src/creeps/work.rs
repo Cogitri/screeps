@@ -71,6 +71,7 @@ impl Creep {
 
             if let Some(offer) = jobs
                 .iter_mut()
+                .filter(|a| a.available_places != 0)
                 .filter(|a| {
                     if let Job::Repair(c) = &a.job {
                         debug!(
@@ -105,7 +106,7 @@ impl Creep {
                         .cmp(&(b.job.priority() * b.job.get_range_to(pos)))
                 })
             {
-                offer.taken = true;
+                offer.available_places -= 1;
 
                 match offer.job {
                     Job::Build(_) => self.inner.say("building", false),

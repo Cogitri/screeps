@@ -1,7 +1,9 @@
 use super::{Creep, Job, JobOffer};
 use log::*;
-use screeps::{constants::StructureType, find, prelude::*, ResourceType, Room};
-use std::collections::HashMap;
+use screeps::{
+    constants::StructureType, find, prelude::*, LookResult, Position, ResourceType, Room, Terrain,
+};
+use std::{collections::HashMap, convert::TryInto};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -44,7 +46,6 @@ impl Regulator {
 
         Ok(())
     }
-
     pub fn new(room: Room) -> Self {
         let mut m = HashMap::new();
 
@@ -69,13 +70,36 @@ impl Regulator {
         self.scan_upgrade_jobs();
     }
 
+    pub fn set_room(&mut self, room: Room) {
+        self.room = room;
+    }
+
+    fn get_free_spots(&self, pos: Position) -> u32 {
+        let c = self
+            .room
+            .look_at_area(pos.y() - 1, pos.x() - 1, pos.y() + 1, pos.x() + 1)
+            .into_iter()
+            .filter(|res| match res.look_result {
+                LookResult::Terrain(t) => t != Terrain::Wall,
+                _ => false,
+            })
+            .count();
+
+        debug!("{} free spots for job", c);
+
+        c.try_into().unwrap()
+    }
+
     fn scan_build_jobs(&mut self) {
         self.jobs.append(
             &mut self
                 .room
                 .find(screeps::constants::find::CONSTRUCTION_SITES)
                 .into_iter()
-                .map(|c| JobOffer::new(Job::Build(c)))
+                .map(|c| {
+                    let spots = self.get_free_spots(c.pos());
+                    JobOffer::new(Job::Build(c), spots)
+                })
                 .collect(),
         )
     }
@@ -86,7 +110,10 @@ impl Regulator {
                 .room
                 .find(screeps::constants::find::SOURCES)
                 .into_iter()
-                .map(|c| JobOffer::new(Job::Harvest(c)))
+                .map(|c| {
+                    let spots = self.get_free_spots(c.pos());
+                    JobOffer::new(Job::Harvest(c), spots)
+                })
                 .collect(),
         )
     }
@@ -105,7 +132,8 @@ impl Regulator {
                             .store_free_capacity(Some(ResourceType::Energy))
                             != 0
                     {
-                        Some(JobOffer::new(Job::Maintain(s)))
+                        let spots = self.get_free_spots(s.pos());
+                        Some(JobOffer::new(Job::Maintain(s), spots))
                     } else {
                         None
                     }
@@ -127,7 +155,7 @@ impl Regulator {
                             && hits < self.room.energy_capacity_available()
                             && hits < a.hits_max()
                         {
-                            return Some(JobOffer::new(Job::Repair(s)));
+                            return Some(JobOffer::new(Job::Repair(s), 1));
                         }
                     }
                     None
@@ -138,7 +166,8 @@ impl Regulator {
 
     fn scan_upgrade_jobs(&mut self) {
         if let Some(c) = self.room.controller() {
-            self.jobs.push(JobOffer::new(Job::Upgrade(c)));
+            let spots = self.get_free_spots(c.pos());
+            self.jobs.push(JobOffer::new(Job::Upgrade(c), spots));
         }
     }
 }

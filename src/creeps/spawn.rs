@@ -46,7 +46,7 @@ pub fn replenish_creeps() -> Result<bool, ReturnCode> {
 
         let room = spawn.room().expect("room isn't visible");
 
-        info!(
+        debug!(
             "room available energy: {}, capacity: {}",
             room.energy_available(),
             room.energy_capacity_available()

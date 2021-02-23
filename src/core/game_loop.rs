@@ -28,7 +28,8 @@ pub fn game_loop() {
         warn!("couldn't spawn: {:?}", e);
     }
 
-    for regulator in REGULATORS.lock().unwrap().values_mut() {
+    for (name, regulator) in REGULATORS.lock().unwrap().iter_mut() {
+        regulator.set_room(screeps::game::rooms::get(name.clone()).unwrap());
         if let Err(e) = regulator.distribute_creeps(spawned.unwrap_or(true)) {
             warn!("{}", e);
         }
