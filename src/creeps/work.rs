@@ -1,7 +1,7 @@
 use super::{Job, JobOffer};
 use crate::core::constants;
 use log::*;
-use screeps::{prelude::*, ResourceType, ReturnCode};
+use screeps::{prelude::*, LineDrawStyle, MoveToOptions, PolyStyle, ResourceType, ReturnCode};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -43,6 +43,14 @@ impl Creep {
             current_job: None,
             inner,
         }
+    }
+
+    pub fn get_name(&self) -> String {
+        self.inner.name()
+    }
+
+    pub fn set_creep(&mut self, creep: screeps::Creep) {
+        self.inner = creep;
     }
 
     pub fn select_job(&mut self, jobs: &mut [JobOffer]) -> Result<()> {
@@ -133,10 +141,10 @@ impl Creep {
             return Ok(false);
         }
 
-        let r = self.inner.build(site);
+        let r = self.inner.build(&site);
 
         if r == ReturnCode::NotInRange {
-            self.move_to(site)?;
+            self.move_to(&site)?;
         } else if r != ReturnCode::Ok {
             return Err(Error::Build(r));
         }
@@ -147,37 +155,47 @@ impl Creep {
     fn harvest(&self, job: &Job) -> Result<bool> {
         debug!("Running harvest");
 
+        debug!("{} free capacity", self.inner.store_free_capacity(None));
+
         if self.inner.store_free_capacity(Some(ResourceType::Energy)) == 0 {
             debug!("Energy storage full, abandoning harvest job!");
             return Ok(false);
         }
 
         let source = job.get_source();
-        let r = self.inner.harvest(source);
+        let r = self.inner.harvest(&source);
         match r {
             ReturnCode::NotInRange => {
                 debug!("Not in range for harvest, moving");
-                self.move_to(source)
+                Ok(!self.move_to(&source)?)
             }
             ReturnCode::Ok => {
                 debug!("harvesting...");
-                Ok(false)
+                Ok(true)
             }
             _ => Err(Error::Harvest(r)),
-        }?;
-
-        Ok(true)
+        }
     }
 
     fn move_to<T: ?Sized + HasPosition>(&self, target: &T) -> Result<bool> {
-        let r = self.inner.move_to(target);
+        let r = self.inner.move_to_with_options(
+            target,
+            MoveToOptions::new()
+                .visualize_path_style(PolyStyle::default().line_style(LineDrawStyle::Dashed)),
+        );
         match r {
-            ReturnCode::Ok => Ok(false),
+            ReturnCode::Ok => {
+                debug!("Ok, moved");
+                Ok(false)
+            }
             ReturnCode::Tired => {
                 debug!("Didn't move because tired!");
                 Ok(false)
             }
-            ReturnCode::NoPath => Ok(true),
+            ReturnCode::NoPath => {
+                debug!("No path!");
+                Ok(true)
+            }
             _ => Err(Error::Move(r)),
         }
     }
@@ -191,13 +209,40 @@ impl Creep {
         }
 
         let target = job.get_structure();
-        let r = self
-            .inner
-            .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
-        match r {
-            ReturnCode::NotInRange => Ok(!self.move_to(target)?),
-            ReturnCode::Ok => Ok(false),
-            _ => Err(Error::Maintain(r)),
+
+        if target
+            .as_has_store()
+            .unwrap()
+            .store_free_capacity(Some(ResourceType::Energy))
+            == 0
+        {
+            debug!("Store is full, abandoning maintain job");
+            return Ok(false);
+        }
+
+        if self.inner.pos().is_near_to(&target) {
+            debug!("Transferring");
+            let r = self
+                .inner
+                .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
+            match r {
+                ReturnCode::NotInRange => {
+                    debug!("Not in range");
+                    Ok(!self.move_to(&target)?)
+                }
+                ReturnCode::Ok => {
+                    debug!("Transferred");
+                    Ok(false)
+                }
+                //ReturnCode::Full => {
+                //    debug!("Full");
+                //    Ok(false)
+                //}
+                _ => Err(Error::Maintain(r)),
+            }
+        } else {
+            self.inner.move_to(&target);
+            Ok(true)
         }
     }
 
@@ -215,10 +260,10 @@ impl Creep {
             return Ok(false);
         }
 
-        let r = self.inner.repair(target);
+        let r = self.inner.repair(&target);
         match r {
             // FIXME: Handle not being able to reach it
-            ReturnCode::NotInRange => self.move_to(target),
+            ReturnCode::NotInRange => self.move_to(&target),
             ReturnCode::Ok => Ok(false),
             _ => Err(Error::Repair(r)),
         }?;
@@ -235,9 +280,9 @@ impl Creep {
         }
 
         let c = job.get_structure_controller();
-        let r = self.inner.upgrade_controller(c);
+        let r = self.inner.upgrade_controller(&c);
         match r {
-            ReturnCode::NotInRange => self.move_to(c),
+            ReturnCode::NotInRange => self.move_to(&c),
             ReturnCode::NotEnough => Ok(false),
             ReturnCode::Ok => Ok(false),
             _ => Err(Error::Upgrade(r)),

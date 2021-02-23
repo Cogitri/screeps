@@ -1,5 +1,5 @@
 use crate::core::constants;
-use screeps::{ConstructionSite, Position, Source, Structure, StructureController};
+use screeps::{ConstructionSite, HasId, Position, Source, Structure, StructureController};
 
 #[derive(Clone)]
 pub enum Job {
@@ -21,9 +21,9 @@ impl Job {
         }
     }
 
-    pub fn get_construction_site(&self) -> &ConstructionSite {
+    pub fn get_construction_site(&self) -> ConstructionSite {
         match self {
-            Job::Build(c) => c,
+            Job::Build(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
             _ => unimplemented!(),
         }
     }
@@ -38,23 +38,25 @@ impl Job {
         }
     }
 
-    pub fn get_source(&self) -> &Source {
+    pub fn get_source(&self) -> Source {
         match self {
-            Job::Harvest(c) => c,
+            Job::Harvest(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
             _ => unimplemented!(),
         }
     }
 
-    pub fn get_structure(&self) -> &Structure {
+    pub fn get_structure(&self) -> Structure {
         match self {
-            Job::Maintain(c) | Job::Repair(c) => c,
+            Job::Maintain(c) | Job::Repair(c) => {
+                screeps::game::get_object_typed(c.id()).unwrap().unwrap()
+            }
             _ => unimplemented!(),
         }
     }
 
-    pub fn get_structure_controller(&self) -> &StructureController {
+    pub fn get_structure_controller(&self) -> StructureController {
         match self {
-            Job::Upgrade(c) => c,
+            Job::Upgrade(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
             _ => unimplemented!(),
         }
     }

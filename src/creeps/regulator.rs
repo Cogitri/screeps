@@ -27,24 +27,19 @@ impl Regulator {
             self.creeps = self
                 .creeps
                 .drain()
-                .filter(|(name, _)| {
-                    let mut found = false;
-                    for x in &creeps {
-                        found = name == &x.name();
-                        if found {
-                            break;
-                        }
-                    }
-                    !found
-                })
+                .filter(|(name, _)| creeps.iter().any(|c| &c.name() == name))
                 .collect();
         }
 
-        for creep in creeps {
-            self.creeps
-                .entry(creep.name())
-                .or_insert(Creep::from_creep(creep))
-                .select_job(&mut self.jobs)?
+        for s_creep in creeps {
+            if let Some(creep) = self.creeps.get_mut(&s_creep.name()) {
+                creep.set_creep(s_creep);
+                creep.select_job(&mut self.jobs)?
+            } else {
+                let mut creep = Creep::from_creep(s_creep);
+                creep.select_job(&mut self.jobs)?;
+                self.creeps.insert(creep.get_name(), creep);
+            }
         }
 
         Ok(())
