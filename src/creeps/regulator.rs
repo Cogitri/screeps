@@ -1,4 +1,5 @@
 use super::{Creep, Job, JobOffer};
+use crate::core::constants;
 use log::*;
 use screeps::{
     constants::StructureType, find, prelude::*, LookResult, Position, ResourceType, Room, Terrain,
@@ -74,10 +75,15 @@ impl Regulator {
         self.room = room;
     }
 
-    fn get_free_spots(&self, pos: Position) -> u32 {
+    fn get_free_spots(&self, pos: Position, range: u32) -> u32 {
         let c = self
             .room
-            .look_at_area(pos.y() - 1, pos.x() - 1, pos.y() + 1, pos.x() + 1)
+            .look_at_area(
+                pos.y() - range,
+                pos.x() - range,
+                pos.y() + range,
+                pos.x() + range,
+            )
             .into_iter()
             .filter(|res| match res.look_result {
                 LookResult::Terrain(t) => t != Terrain::Wall,
@@ -97,7 +103,7 @@ impl Regulator {
                 .find(screeps::constants::find::CONSTRUCTION_SITES)
                 .into_iter()
                 .map(|c| {
-                    let spots = self.get_free_spots(c.pos());
+                    let spots = self.get_free_spots(c.pos(), constants::RANGE_BUILD);
                     JobOffer::new(Job::Build(c), spots)
                 })
                 .collect(),
@@ -111,7 +117,7 @@ impl Regulator {
                 .find(screeps::constants::find::SOURCES)
                 .into_iter()
                 .map(|c| {
-                    let spots = self.get_free_spots(c.pos());
+                    let spots = self.get_free_spots(c.pos(), constants::RANGE_HARVEST);
                     JobOffer::new(Job::Harvest(c), spots)
                 })
                 .collect(),
@@ -132,7 +138,7 @@ impl Regulator {
                             .store_free_capacity(Some(ResourceType::Energy))
                             != 0
                     {
-                        let spots = self.get_free_spots(s.pos());
+                        let spots = self.get_free_spots(s.pos(), constants::RANGE_TRANSFER);
                         Some(JobOffer::new(Job::Maintain(s), spots))
                     } else {
                         None
@@ -166,7 +172,7 @@ impl Regulator {
 
     fn scan_upgrade_jobs(&mut self) {
         if let Some(c) = self.room.controller() {
-            let spots = self.get_free_spots(c.pos());
+            let spots = self.get_free_spots(c.pos(), constants::RANGE_UPGRADE_CONTROLLER);
             self.jobs.push(JobOffer::new(Job::Upgrade(c), spots));
         }
     }
