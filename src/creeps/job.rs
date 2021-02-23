@@ -1,4 +1,5 @@
 use crate::core::constants;
+use log::*;
 use screeps::{ConstructionSite, HasId, Position, Source, Structure, StructureController};
 
 #[derive(Clone)]
@@ -24,7 +25,23 @@ impl Job {
     pub fn get_construction_site(&self) -> ConstructionSite {
         match self {
             Job::Build(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
-            _ => unimplemented!(),
+            _ => {
+                error!(
+                    "Tried to get construction site when job is a {}",
+                    self.get_type()
+                );
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn get_type(&self) -> &'static str {
+        match self {
+            Job::Build(_) => "build",
+            Job::Harvest(_) => "harvest",
+            Job::Maintain(_) => "maintain",
+            Job::Repair(_) => "repair",
+            Job::Upgrade(_) => "upgrade",
         }
     }
 
@@ -41,7 +58,10 @@ impl Job {
     pub fn get_source(&self) -> Source {
         match self {
             Job::Harvest(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
-            _ => unimplemented!(),
+            _ => {
+                error!("Tried to get source when job is a {}", self.get_type());
+                unimplemented!()
+            }
         }
     }
 
@@ -50,14 +70,23 @@ impl Job {
             Job::Maintain(c) | Job::Repair(c) => {
                 screeps::game::get_object_typed(c.id()).unwrap().unwrap()
             }
-            _ => unimplemented!(),
+            _ => {
+                error!("Tried to get structure when job is a {}", self.get_type());
+                unimplemented!()
+            }
         }
     }
 
     pub fn get_structure_controller(&self) -> StructureController {
         match self {
             Job::Upgrade(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
-            _ => unimplemented!(),
+            _ => {
+                error!(
+                    "Tried to get structure controller when job is a {}",
+                    self.get_type()
+                );
+                unimplemented!()
+            }
         }
     }
 }
