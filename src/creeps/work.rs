@@ -108,10 +108,27 @@ impl Creep {
             {
                 offer.available_places -= 1;
 
-                match offer.job {
+                match &offer.job {
+                    // FIXME: Check if one creep is enough for building
                     Job::Build(_) => self.inner.say("building", false),
                     Job::Harvest(_) => self.inner.say("harvesting", false),
-                    Job::Maintain(_) => self.inner.say("maintaining", false),
+                    Job::Maintain(target) => {
+                        // Don't move multiple creeps to maintainance when one creep can fill the spot
+                        if offer.available_places != 0
+                            && i64::from(
+                                target
+                                    .as_has_store()
+                                    .unwrap()
+                                    .store_free_capacity(Some(ResourceType::Energy)),
+                            ) <= i64::from(
+                                self.inner.store_used_capacity(Some(ResourceType::Energy)),
+                            )
+                        {
+                            offer.available_places = 0;
+                        }
+                        self.inner.say("maintaining", false)
+                    }
+                    // FIXME: Check if one creep is enough for repairing
                     Job::Repair(_) => self.inner.say("repairing", false),
                     Job::Upgrade(_) => self.inner.say("upgrading", false),
                 };
