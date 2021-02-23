@@ -23,3 +23,5 @@ pub static RANGE_RESERVE_CONTROLLER: u32 = 1;
 pub static RANGE_TRANSFER: u32 = 1;
 pub static RANGE_UPGRADE_CONTROLLER: u32 = 3;
 pub static RANGE_WITHDRAW: u32 = 1;
+pub static ROOM_X: u32 = 50;
+pub static ROOM_Y: u32 = 50;

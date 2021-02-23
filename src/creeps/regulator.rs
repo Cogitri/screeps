@@ -1,5 +1,5 @@
 use super::{Creep, Job, JobOffer};
-use crate::core::constants;
+use crate::core::{constants, NumHelper};
 use log::*;
 use screeps::{
     constants::StructureType, find, prelude::*, LookResult, Position, ResourceType, Room, Terrain,
@@ -79,10 +79,10 @@ impl Regulator {
         let c = self
             .room
             .look_at_area(
-                pos.y() - range,
-                pos.x() - range,
-                pos.y() + range,
-                pos.x() + range,
+                (pos.y() - range).limit_min(0),
+                (pos.x() - range).limit_min(0),
+                (pos.y() + range).limit_max(constants::ROOM_Y - 1),
+                (pos.x() + range).limit_max(constants::ROOM_X - 1),
             )
             .into_iter()
             .filter(|res| match res.look_result {
