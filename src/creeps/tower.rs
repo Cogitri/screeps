@@ -99,40 +99,45 @@ impl Tower {
     fn attack(&self, job: &Job) -> Result<bool> {
         debug!("Running attack");
 
-        let creep = job.get_creep();
-
-        let r = self.inner.attack(&creep);
-        match r {
-            ReturnCode::Ok => {
-                if job.get_creep().hits() == 0 {
-                    info!("Killed enemy, abandoning job!");
-                    Ok(false)
-                } else {
-                    Ok(true)
+        if let Some(creep) = job.get_creep() {
+            let r = self.inner.attack(&creep);
+            match r {
+                ReturnCode::Ok => {
+                    if job.get_creep().map(|c| c.hits()).unwrap_or(0) == 0 {
+                        info!("Killed enemy, abandoning job!");
+                        Ok(false)
+                    } else {
+                        Ok(true)
+                    }
                 }
+                _ => Err(Error::Attack(r)),
             }
-            _ => Err(Error::Attack(r)),
+        } else {
+            Ok(false)
         }
     }
 
     fn repair(&self, job: &Job) -> Result<bool> {
         debug!("Running repair");
 
-        let target = job.get_structure();
-        let attackable = target.as_attackable().unwrap();
-        if attackable.hits() == attackable.hits_max()
-            || attackable.hits()
-                > self.inner.store_capacity(Some(ResourceType::Energy))
-                    * constants::MAX_REPAIR_MULTIPLIER
-        {
-            return Ok(false);
-        }
+        if let Some(target) = job.get_structure() {
+            let attackable = target.as_attackable().unwrap();
+            if attackable.hits() == attackable.hits_max()
+                || attackable.hits()
+                    > self.inner.store_capacity(Some(ResourceType::Energy))
+                        * constants::MAX_REPAIR_MULTIPLIER
+            {
+                return Ok(false);
+            }
 
-        let r = self.inner.repair(&target);
-        match r {
-            ReturnCode::Ok => Ok(true),
-            ReturnCode::NotEnough => Ok(true),
-            _ => Err(Error::Repair(r)),
+            let r = self.inner.repair(&target);
+            match r {
+                ReturnCode::Ok => Ok(true),
+                ReturnCode::NotEnough => Ok(true),
+                _ => Err(Error::Repair(r)),
+            }
+        } else {
+            Ok(false)
         }
     }
 }

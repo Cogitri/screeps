@@ -24,9 +24,9 @@ impl Job {
         }
     }
 
-    pub fn get_construction_site(&self) -> ConstructionSite {
+    pub fn get_construction_site(&self) -> Option<ConstructionSite> {
         match self {
-            Job::Build(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
+            Job::Build(c) => screeps::game::get_object_typed(c.id()).unwrap(),
             _ => {
                 error!(
                     "Tried to get construction site when job is a {}",
@@ -37,9 +37,9 @@ impl Job {
         }
     }
 
-    pub fn get_creep(&self) -> Creep {
+    pub fn get_creep(&self) -> Option<Creep> {
         match self {
-            Job::Attack(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
+            Job::Attack(c) => screeps::game::get_object_typed(c.id()).unwrap(),
             _ => {
                 error!("Tried to get creep when job is a {}", self.get_type());
                 unimplemented!()
@@ -69,9 +69,9 @@ impl Job {
         }
     }
 
-    pub fn get_source(&self) -> Source {
+    pub fn get_source(&self) -> Option<Source> {
         match self {
-            Job::Harvest(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
+            Job::Harvest(c) => screeps::game::get_object_typed(c.id()).unwrap(),
             _ => {
                 error!("Tried to get source when job is a {}", self.get_type());
                 unimplemented!()
@@ -79,11 +79,9 @@ impl Job {
         }
     }
 
-    pub fn get_structure(&self) -> Structure {
+    pub fn get_structure(&self) -> Option<Structure> {
         match self {
-            Job::Maintain(c) | Job::Repair(c) => {
-                screeps::game::get_object_typed(c.id()).unwrap().unwrap()
-            }
+            Job::Maintain(c) | Job::Repair(c) => screeps::game::get_object_typed(c.id()).unwrap(),
             _ => {
                 error!("Tried to get structure when job is a {}", self.get_type());
                 unimplemented!()

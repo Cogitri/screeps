@@ -161,22 +161,24 @@ impl Creep {
             return Ok(false);
         }
 
-        let site = job.get_construction_site();
+        if let Some(site) = job.get_construction_site() {
+            if site.progress() == site.progress_total() {
+                debug!("Building done, abandoning build job!");
+                return Ok(false);
+            }
 
-        if site.progress() == site.progress_total() {
-            debug!("Building done, abandoning build job!");
-            return Ok(false);
+            let r = self.inner.build(&site);
+
+            if r == ReturnCode::NotInRange {
+                self.move_to(&site)?;
+            } else if r != ReturnCode::Ok {
+                return Err(Error::Build(r));
+            }
+
+            Ok(true)
+        } else {
+            Ok(false)
         }
-
-        let r = self.inner.build(&site);
-
-        if r == ReturnCode::NotInRange {
-            self.move_to(&site)?;
-        } else if r != ReturnCode::Ok {
-            return Err(Error::Build(r));
-        }
-
-        Ok(true)
     }
 
     fn harvest(&self, job: &Job) -> Result<bool> {
@@ -189,18 +191,21 @@ impl Creep {
             return Ok(false);
         }
 
-        let source = job.get_source();
-        let r = self.inner.harvest(&source);
-        match r {
-            ReturnCode::NotInRange => {
-                debug!("Not in range for harvest, moving");
-                Ok(!self.move_to(&source)?)
+        if let Some(source) = job.get_source() {
+            let r = self.inner.harvest(&source);
+            match r {
+                ReturnCode::NotInRange => {
+                    debug!("Not in range for harvest, moving");
+                    Ok(!self.move_to(&source)?)
+                }
+                ReturnCode::Ok => {
+                    debug!("harvesting...");
+                    Ok(true)
+                }
+                _ => Err(Error::Harvest(r)),
             }
-            ReturnCode::Ok => {
-                debug!("harvesting...");
-                Ok(true)
-            }
-            _ => Err(Error::Harvest(r)),
+        } else {
+            Ok(false)
         }
     }
 
@@ -235,41 +240,43 @@ impl Creep {
             return Ok(false);
         }
 
-        let target = job.get_structure();
+        if let Some(target) = job.get_structure() {
+            if target
+                .as_has_store()
+                .unwrap()
+                .store_free_capacity(Some(ResourceType::Energy))
+                == 0
+            {
+                debug!("Store is full, abandoning maintain job");
+                return Ok(false);
+            }
 
-        if target
-            .as_has_store()
-            .unwrap()
-            .store_free_capacity(Some(ResourceType::Energy))
-            == 0
-        {
-            debug!("Store is full, abandoning maintain job");
-            return Ok(false);
-        }
-
-        if self.inner.pos().is_near_to(&target) {
-            debug!("Transferring");
-            let r = self
-                .inner
-                .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
-            match r {
-                ReturnCode::NotInRange => {
-                    debug!("Not in range");
-                    Ok(!self.move_to(&target)?)
+            if self.inner.pos().is_near_to(&target) {
+                debug!("Transferring");
+                let r = self
+                    .inner
+                    .transfer_all(target.as_transferable().unwrap(), ResourceType::Energy);
+                match r {
+                    ReturnCode::NotInRange => {
+                        debug!("Not in range");
+                        Ok(!self.move_to(&target)?)
+                    }
+                    ReturnCode::Ok => {
+                        debug!("Transferred");
+                        Ok(false)
+                    }
+                    //ReturnCode::Full => {
+                    //    debug!("Full");
+                    //    Ok(false)
+                    //}
+                    _ => Err(Error::Maintain(r)),
                 }
-                ReturnCode::Ok => {
-                    debug!("Transferred");
-                    Ok(false)
-                }
-                //ReturnCode::Full => {
-                //    debug!("Full");
-                //    Ok(false)
-                //}
-                _ => Err(Error::Maintain(r)),
+            } else {
+                self.inner.move_to(&target);
+                Ok(true)
             }
         } else {
-            self.inner.move_to(&target);
-            Ok(true)
+            Ok(false)
         }
     }
 
@@ -281,21 +288,24 @@ impl Creep {
             return Ok(false);
         }
 
-        let target = job.get_structure();
-        let attackable = target.as_attackable().unwrap();
-        if attackable.hits() == attackable.hits_max() {
-            return Ok(false);
+        if let Some(target) = job.get_structure() {
+            let attackable = target.as_attackable().unwrap();
+            if attackable.hits() == attackable.hits_max() {
+                return Ok(false);
+            }
+
+            let r = self.inner.repair(&target);
+            match r {
+                // FIXME: Handle not being able to reach it
+                ReturnCode::NotInRange => self.move_to(&target),
+                ReturnCode::Ok => Ok(false),
+                _ => Err(Error::Repair(r)),
+            }?;
+
+            Ok(true)
+        } else {
+            Ok(false)
         }
-
-        let r = self.inner.repair(&target);
-        match r {
-            // FIXME: Handle not being able to reach it
-            ReturnCode::NotInRange => self.move_to(&target),
-            ReturnCode::Ok => Ok(false),
-            _ => Err(Error::Repair(r)),
-        }?;
-
-        Ok(true)
     }
 
     fn upgrade(&self, job: &Job) -> Result<bool> {
