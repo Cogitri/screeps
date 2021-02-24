@@ -1,9 +1,10 @@
 use crate::core::constants;
 use log::*;
-use screeps::{ConstructionSite, HasId, Position, Source, Structure, StructureController};
+use screeps::{ConstructionSite, Creep, HasId, Position, Source, Structure, StructureController};
 
 #[derive(Clone)]
 pub enum Job {
+    Attack(Creep),
     Build(ConstructionSite),
     Harvest(Source),
     Maintain(Structure),
@@ -14,6 +15,7 @@ pub enum Job {
 impl Job {
     pub fn priority(&self) -> u32 {
         match self {
+            Job::Attack(_) => constants::PRIORITY_ATTACK,
             Job::Build(_) => constants::PRIORITY_BUILDING,
             Job::Harvest(_) => constants::PRIORITY_HARVESTING,
             Job::Maintain(_) => constants::PRIORITY_MAINTAINING,
@@ -35,8 +37,19 @@ impl Job {
         }
     }
 
+    pub fn get_creep(&self) -> Creep {
+        match self {
+            Job::Attack(c) => screeps::game::get_object_typed(c.id()).unwrap().unwrap(),
+            _ => {
+                error!("Tried to get creep when job is a {}", self.get_type());
+                unimplemented!()
+            }
+        }
+    }
+
     pub fn get_type(&self) -> &'static str {
         match self {
+            Job::Attack(_) => "attack",
             Job::Build(_) => "build",
             Job::Harvest(_) => "harvest",
             Job::Maintain(_) => "maintain",
@@ -47,6 +60,7 @@ impl Job {
 
     pub fn get_range_to(&self, pos: Position) -> u32 {
         match self {
+            Job::Attack(c) => pos.get_range_to(c),
             Job::Build(c) => pos.get_range_to(c),
             Job::Harvest(c) => pos.get_range_to(c),
             Job::Maintain(c) => pos.get_range_to(c),

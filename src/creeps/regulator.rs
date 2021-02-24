@@ -1,8 +1,9 @@
-use super::{Creep, Job, JobOffer};
+use super::{Creep, Job, JobOffer, Tower};
 use crate::core::{constants, NumHelper};
 use log::*;
 use screeps::{
-    constants::StructureType, find, prelude::*, LookResult, Position, ResourceType, Room, Terrain,
+    constants::StructureType, find, prelude::*, LookResult, Position, ResourceType, Room,
+    Structure, StructureTower, Terrain,
 };
 use std::{collections::HashMap, convert::TryInto};
 use thiserror::Error;
@@ -11,18 +12,21 @@ use thiserror::Error;
 pub enum Error {
     #[error("Couldn't make creep do action: `{0:?}`")]
     Creep(#[from] super::work::Error),
+    #[error("Couldn't make tower do action `{0:?}`")]
+    Tower(#[from] super::tower::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Regulator {
     creeps: HashMap<String, Creep>,
+    towers: HashMap<String, Tower>,
     jobs: Vec<JobOffer>,
     room: Room,
 }
 
 impl Regulator {
-    pub fn distribute_creeps(&mut self, respawned: bool) -> Result<()> {
+    pub fn distribute_jobs(&mut self, respawned: bool) -> Result<()> {
         let creeps = screeps::game::creeps::values();
 
         if respawned {
@@ -45,17 +49,50 @@ impl Regulator {
             }
         }
 
+        let towers = self
+            .room
+            .find(screeps::constants::find::MY_STRUCTURES)
+            .into_iter()
+            .filter_map(|s| match s.as_structure() {
+                Structure::Tower(t) => Some(t),
+                _ => None,
+            })
+            .collect::<Vec<StructureTower>>();
+
+        // Filter out removed towers
+        self.towers = self
+            .towers
+            .drain()
+            .filter(|(id, _)| towers.iter().any(|t| &t.id().to_string() == id))
+            .collect();
+
+        for s_tower in towers {
+            if let Some(tower) = self.towers.get_mut(&s_tower.id().to_string()) {
+                tower.set_tower(s_tower);
+                tower.select_job(&mut self.jobs)?;
+            } else {
+                let mut tower = Tower::from_tower(s_tower);
+                tower.select_job(&mut self.jobs)?;
+                self.towers.insert(tower.get_id(), tower);
+            }
+        }
+
         Ok(())
     }
     pub fn new(room: Room) -> Self {
-        let mut m = HashMap::new();
-
-        for creep in screeps::game::creeps::values() {
-            m.insert(creep.name(), Creep::from_creep(creep));
-        }
-
         Self {
-            creeps: m,
+            creeps: screeps::game::creeps::values()
+                .into_iter()
+                .map(|c| (c.name(), Creep::from_creep(c)))
+                .collect(),
+            towers: room
+                .find(screeps::constants::find::MY_STRUCTURES)
+                .into_iter()
+                .filter_map(|s| match s.as_structure() {
+                    Structure::Tower(t) => Some((t.id().to_string(), Tower::from_tower(t))),
+                    _ => None,
+                })
+                .collect(),
             jobs: Vec::new(),
             room,
         }
@@ -64,6 +101,7 @@ impl Regulator {
     pub fn scan(&mut self) {
         self.jobs.clear();
 
+        self.scan_attackable();
         self.scan_build_jobs();
         self.scan_harvest_jobs();
         self.scan_maintain_jobs();
@@ -94,6 +132,17 @@ impl Regulator {
         debug!("{} free spots for job", c);
 
         c.try_into().unwrap()
+    }
+
+    fn scan_attackable(&mut self) {
+        self.jobs.append(
+            &mut self
+                .room
+                .find(screeps::constants::find::HOSTILE_CREEPS)
+                .into_iter()
+                .map(|c| JobOffer::new(Job::Attack(c), 5))
+                .collect(),
+        )
     }
 
     fn scan_build_jobs(&mut self) {
@@ -132,7 +181,9 @@ impl Regulator {
                 .into_iter()
                 .filter_map(|s| {
                     let typ = s.structure_type();
-                    if (typ == StructureType::Extension || typ == StructureType::Spawn)
+                    if (typ == StructureType::Extension
+                        || typ == StructureType::Spawn
+                        || typ == StructureType::Tower)
                         && s.as_has_store()
                             .unwrap()
                             .store_free_capacity(Some(ResourceType::Energy))

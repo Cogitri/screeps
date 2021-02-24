@@ -30,7 +30,7 @@ pub fn game_loop() {
 
     for (name, regulator) in REGULATORS.lock().unwrap().iter_mut() {
         regulator.set_room(screeps::game::rooms::get(name.clone()).unwrap());
-        if let Err(e) = regulator.distribute_creeps(spawned.unwrap_or(true)) {
+        if let Err(e) = regulator.distribute_jobs(spawned.unwrap_or(true)) {
             warn!("{}", e);
         }
     }
