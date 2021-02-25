@@ -1,4 +1,4 @@
-pub static MAX_CREEPS: usize = 5;
+pub static MAX_CREEPS: usize = 10;
 pub static MAX_REPAIR_MULTIPLIER: u32 = 4;
 pub static PRIORITY_ATTACK: u32 = 0;
 pub static PRIORITY_BUILDING: u32 = 3;
