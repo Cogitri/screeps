@@ -73,9 +73,9 @@ impl Creep {
             if let Some(offer) = jobs
                 .iter_mut()
                 .filter(|a| {
-                    if let Job::Attack(_) = a.job {
+                    if matches!(a.job, Job::Attack(_)) {
                         false
-                    } else if let Job::Heal(_) = a.job {
+                    } else if matches!(a.job, Job::Heal(_)) {
                         false
                     } else {
                         true

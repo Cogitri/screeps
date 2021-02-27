@@ -75,9 +75,9 @@ impl Tower {
                             self.inner.store_capacity(Some(ResourceType::Energy))
                                 * constants::MAX_REPAIR_MULTIPLIER
                         );
-                        return c.as_attackable().unwrap().hits()
+                        c.as_attackable().unwrap().hits()
                             < self.inner.store_capacity(Some(ResourceType::Energy))
-                                * constants::MAX_REPAIR_MULTIPLIER;
+                                * constants::MAX_REPAIR_MULTIPLIER
                     }
                     _ => false,
                 })

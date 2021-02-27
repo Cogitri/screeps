@@ -29,7 +29,7 @@ pub fn game_loop() {
     }
 
     for (name, regulator) in REGULATORS.lock().unwrap().iter_mut() {
-        regulator.set_room(screeps::game::rooms::get(name.clone()).unwrap());
+        regulator.set_room(screeps::game::rooms::get(*name).unwrap());
         if let Err(e) = regulator.distribute_jobs(spawned.unwrap_or(true)) {
             warn!("{}", e);
         }
