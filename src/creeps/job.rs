@@ -7,6 +7,7 @@ pub enum Job {
     Attack(Creep),
     Build(ConstructionSite),
     Harvest(Source),
+    Heal(Creep),
     Maintain(Structure),
     Repair(Structure),
     Upgrade(StructureController),
@@ -18,6 +19,7 @@ impl Job {
             Job::Attack(_) => constants::PRIORITY_ATTACK,
             Job::Build(_) => constants::PRIORITY_BUILDING,
             Job::Harvest(_) => constants::PRIORITY_HARVESTING,
+            Job::Heal(_) => constants::PRIORITY_HEALING,
             Job::Maintain(_) => constants::PRIORITY_MAINTAINING,
             Job::Repair(_) => constants::PRIORITY_REPAIRING,
             Job::Upgrade(_) => constants::PRIORITY_UPGRADING,
@@ -39,7 +41,7 @@ impl Job {
 
     pub fn get_creep(&self) -> Option<Creep> {
         match self {
-            Job::Attack(c) => screeps::game::get_object_typed(c.id()).unwrap(),
+            Job::Attack(c) | Job::Heal(c) => screeps::game::get_object_typed(c.id()).unwrap(),
             _ => {
                 error!("Tried to get creep when job is a {}", self.get_type());
                 unimplemented!()
@@ -52,6 +54,7 @@ impl Job {
             Job::Attack(_) => "attack",
             Job::Build(_) => "build",
             Job::Harvest(_) => "harvest",
+            Job::Heal(_) => "heal",
             Job::Maintain(_) => "maintain",
             Job::Repair(_) => "repair",
             Job::Upgrade(_) => "upgrade",
@@ -63,6 +66,7 @@ impl Job {
             Job::Attack(c) => pos.get_range_to(c),
             Job::Build(c) => pos.get_range_to(c),
             Job::Harvest(c) => pos.get_range_to(c),
+            Job::Heal(c) => pos.get_range_to(c),
             Job::Maintain(c) => pos.get_range_to(c),
             Job::Repair(c) => pos.get_range_to(c),
             Job::Upgrade(c) => pos.get_range_to(c),

@@ -1,11 +1,12 @@
 pub static MAX_CREEPS: usize = 10;
 pub static MAX_REPAIR_MULTIPLIER: u32 = 4;
 pub static PRIORITY_ATTACK: u32 = 0;
-pub static PRIORITY_BUILDING: u32 = 3;
-pub static PRIORITY_HARVESTING: u32 = 5;
-pub static PRIORITY_MAINTAINING: u32 = 2;
-pub static PRIORITY_REPAIRING: u32 = 1;
-pub static PRIORITY_UPGRADING: u32 = 4;
+pub static PRIORITY_BUILDING: u32 = 4;
+pub static PRIORITY_HARVESTING: u32 = 6;
+pub static PRIORITY_HEALING: u32 = 1;
+pub static PRIORITY_MAINTAINING: u32 = 3;
+pub static PRIORITY_REPAIRING: u32 = 2;
+pub static PRIORITY_UPGRADING: u32 = 5;
 pub static RANGE_ATACK: u32 = 1;
 pub static RANGE_ATTACK_CONTROLLER: u32 = 1;
 pub static RANGE_BUILD: u32 = 3;

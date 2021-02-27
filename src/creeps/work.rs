@@ -30,7 +30,7 @@ type Result<T> = std::result::Result<T, crate::creeps::work::Error>;
 impl Creep {
     pub fn execute_job(&self, job: &Job) -> Result<bool> {
         Ok(match job {
-            Job::Attack(_) => unimplemented!(),
+            Job::Attack(_) | Job::Heal(_) => unimplemented!(),
             Job::Build(_) => self.build(&job)?,
             Job::Harvest(_) => self.harvest(&job)?,
             Job::Maintain(_) => self.maintain(&job)?,
@@ -74,9 +74,11 @@ impl Creep {
                 .iter_mut()
                 .filter(|a| {
                     if let Job::Attack(_) = a.job {
-                        return false;
+                        false
+                    } else if let Job::Heal(_) = a.job {
+                        false
                     } else {
-                        return true;
+                        true
                     }
                 })
                 .filter(|a| a.available_places != 0)
@@ -117,7 +119,7 @@ impl Creep {
                 offer.available_places -= 1;
 
                 match &offer.job {
-                    Job::Attack(_) => unimplemented!(),
+                    Job::Attack(_) | Job::Heal(_) => unimplemented!(),
                     // FIXME: Check if one creep is enough for building
                     Job::Build(_) => self.inner.say("building", false),
                     Job::Harvest(_) => self.inner.say("harvesting", false),

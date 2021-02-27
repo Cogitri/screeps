@@ -2,8 +2,8 @@ use super::{Creep, Job, JobOffer, Tower};
 use crate::core::{constants, NumHelper};
 use log::*;
 use screeps::{
-    constants::StructureType, find, prelude::*, LookResult, Position, ResourceType, Room,
-    Structure, StructureTower, Terrain,
+    constants::StructureType, find, prelude::*, Attackable, LookResult, Position, ResourceType,
+    Room, Structure, StructureTower, Terrain,
 };
 use std::{collections::HashMap, convert::TryInto};
 use thiserror::Error;
@@ -101,9 +101,10 @@ impl Regulator {
     pub fn scan(&mut self) {
         self.jobs.clear();
 
-        self.scan_attackable();
+        self.scan_attack_jobs();
         self.scan_build_jobs();
         self.scan_harvest_jobs();
+        self.scan_heal_jobs();
         self.scan_maintain_jobs();
         self.scan_repair_jobs();
         self.scan_upgrade_jobs();
@@ -134,7 +135,7 @@ impl Regulator {
         c.try_into().unwrap()
     }
 
-    fn scan_attackable(&mut self) {
+    fn scan_attack_jobs(&mut self) {
         self.jobs.append(
             &mut self
                 .room
@@ -168,6 +169,23 @@ impl Regulator {
                 .map(|c| {
                     let spots = self.get_free_spots(c.pos(), constants::RANGE_HARVEST);
                     JobOffer::new(Job::Harvest(c), spots)
+                })
+                .collect(),
+        )
+    }
+
+    fn scan_heal_jobs(&mut self) {
+        self.jobs.append(
+            &mut self
+                .room
+                .find(screeps::constants::find::MY_CREEPS)
+                .into_iter()
+                .filter_map(|c| {
+                    if c.hits() == c.hits_max() {
+                        None
+                    } else {
+                        Some(JobOffer::new(Job::Heal(c), 1))
+                    }
                 })
                 .collect(),
         )

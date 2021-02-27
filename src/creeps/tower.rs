@@ -8,6 +8,8 @@ use thiserror::Error;
 pub enum Error {
     #[error("Couldn't attack: `{0:?}`")]
     Attack(ReturnCode),
+    #[error("Couldn't heal: `{0:?}`")]
+    Heal(ReturnCode),
     #[error("Couldn't repair: `{0:?}`")]
     Repair(ReturnCode),
 }
@@ -24,6 +26,7 @@ impl Tower {
         // FIXME: Allow Health
         Ok(match job {
             Job::Attack(_) => self.attack(&job)?,
+            Job::Heal(_) => self.heal(&job)?,
             Job::Repair(_) => self.repair(&job)?,
             _ => unimplemented!(),
         })
@@ -64,7 +67,7 @@ impl Tower {
                 .iter_mut()
                 .filter(|a| a.available_places != 0)
                 .filter(|a| match &a.job {
-                    Job::Attack(_) => true,
+                    Job::Attack(_) | Job::Heal(_) => true,
                     Job::Repair(c) => {
                         debug!(
                             "Repair: {} hits vs {} capacity",
@@ -111,6 +114,31 @@ impl Tower {
                     }
                 }
                 _ => Err(Error::Attack(r)),
+            }
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn heal(&self, job: &Job) -> Result<bool> {
+        debug!("Running heal");
+
+        if let Some(creep) = job.get_creep() {
+            let r = self.inner.heal(&creep);
+            match r {
+                ReturnCode::Ok => {
+                    if job
+                        .get_creep()
+                        .map(|c| c.hits() == c.hits_max())
+                        .unwrap_or(false)
+                    {
+                        info!("Healed creep, abandoning job!");
+                        Ok(false)
+                    } else {
+                        Ok(true)
+                    }
+                }
+                _ => Err(Error::Heal(r)),
             }
         } else {
             Ok(false)
