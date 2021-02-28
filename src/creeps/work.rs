@@ -204,6 +204,10 @@ impl Creep {
                     debug!("harvesting...");
                     Ok(true)
                 }
+                ReturnCode::NotEnough => {
+                    debug!("Energy source is empty, abandoning job!");
+                    Ok(false)
+                }
                 _ => Err(Error::Harvest(r)),
             }
         } else {
