@@ -166,9 +166,13 @@ impl Regulator {
                 .room
                 .find(screeps::constants::find::SOURCES)
                 .into_iter()
-                .map(|c| {
-                    let spots = self.get_free_spots(c.pos(), constants::RANGE_HARVEST);
-                    JobOffer::new(Job::Harvest(c), spots)
+                .filter_map(|c| {
+                    if c.energy() != 0 {
+                        let spots = self.get_free_spots(c.pos(), constants::RANGE_HARVEST);
+                        Some(JobOffer::new(Job::Harvest(c), spots))
+                    } else {
+                        None
+                    }
                 })
                 .collect(),
         )
