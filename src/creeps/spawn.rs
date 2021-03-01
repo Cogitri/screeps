@@ -62,11 +62,13 @@ pub fn replenish_creeps() -> Result<bool, ReturnCode> {
         let mut sum = body.iter().map(|p| p.cost()).sum();
         let mut iter = BodyParts::new();
         let mut next = iter.next().unwrap();
+        let mut num_bodyparts = 0;
 
-        while energy >= (sum + next.cost()) {
+        while energy >= (sum + next.cost()) && num_bodyparts <= constants::MAX_CREEPS_BODY_PARTS {
             body.push(next);
             sum = body.iter().map(|p| p.cost()).sum();
             next = iter.next().unwrap();
+            num_bodyparts += 1;
         }
 
         if energy >= sum {
